@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF First Page to Image</title>
+
+</head>
+<body>    
+    <input type="file" id="fileInput" accept=".pdf">
+    <button id="downloadBtn" style="display: none;">Download All as JPEG</button>
+    
+    <div id="status"></div>
+    <div id="canvasContainer"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs" type="module"></script>
+    
+    <script type="module">
+        // Import PDF.js
+        import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs';
+        
+        // Set worker path
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs';
+        
+        const fileInput = document.getElementById('fileInput');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const status = document.getElementById('status');
+        const canvasContainer = document.getElementById('canvasContainer');
+        let canvases = []; // Store all canvases for download
+        
+        // Handle file upload
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) handleFile(file);
+        });
+        
+        // Handle download
+        downloadBtn.addEventListener('click', downloadAllImages);
+        
+        async function handleFile(file) {
+            try {
+                showLoading('Loading PDF...');
+                
+                // Clear previous canvases
+                canvasContainer.innerHTML = '';
+                canvases = [];
+                downloadBtn.style.display = 'none';
+                
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+                
+                showLoading(`Rendering ${pdf.numPages} pages...`);
+                
+                // Render all pages
+                for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                    const page = await pdf.getPage(pageNum);
+                    
+                    // Create canvas for this page
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    
+                    // Set scale for good quality
+                    const scale = 2.0;
+                    const viewport = page.getViewport({ scale });
+                    
+                    // Set canvas dimensions
+                    canvas.width = viewport.width;
+                    canvas.height = viewport.height;
+                    canvas.style.width = viewport.width / 2 + 'px';
+                    canvas.style.height = viewport.height / 2 + 'px';
+                    canvas.style.display = 'block';
+                    canvas.style.marginBottom = '10px';
+                    
+                    // Render page to canvas
+                    const renderContext = {
+                        canvasContext: ctx,
+                        viewport: viewport
+                    };
+                    
+                    await page.render(renderContext).promise;
+                    
+                    // Store canvas for download
+                    canvases.push(canvas);
+                    
+                    // Add page number label
+                    const pageLabel = document.createElement('p');
+                    pageLabel.textContent = `Page ${pageNum}`;
+                    canvasContainer.appendChild(pageLabel);
+                    canvasContainer.appendChild(canvas);
+                }
+                
+                // Show download button
+                downloadBtn.style.display = 'inline-block';
+                showSuccess(`Successfully rendered all ${pdf.numPages} pages!`);
+                
+            } catch (error) {
+                console.error('Error:', error);
+                showError('Error loading PDF: ' + error.message);
+            }
+        }
+        
+        async function downloadAllImages() {
+            try {
+                // Check if File System Access API is supported
+                if ('showDirectoryPicker' in window) {
+                    // Use File System Access API to let user choose directory
+                    const dirHandle = await window.showDirectoryPicker();
+                    
+                    showLoading('Downloading images...');
+                    
+                    for (let i = 0; i < canvases.length; i++) {
+                        const canvas = canvases[i];
+                        
+                        // Convert canvas to blob
+                        const blob = await new Promise(resolve => {
+                            canvas.toBlob(resolve, 'image/jpeg', 0.9);
+                        });
+                        
+                        // Create file in selected directory
+                        const fileName = `page_${i + 1}.jpg`;
+                        const fileHandle = await dirHandle.getFileHandle(fileName, { create: true });
+                        const writable = await fileHandle.createWritable();
+                        await writable.write(blob);
+                        await writable.close();
+                    }
+                    
+                    showSuccess(`Downloaded ${canvases.length} images to selected folder!`);
+                } else {
+                    // Fallback: download files individually
+                    showLoading('Downloading images (one by one)...');
+                    
+                    for (let i = 0; i < canvases.length; i++) {
+                        const canvas = canvases[i];
+                        const dataURL = canvas.toDataURL('image/jpeg', 0.9);
+                        
+                        // Create download link
+                        const link = document.createElement('a');
+                        link.download = `page_${i + 1}.jpg`;
+                        link.href = dataURL;
+                        link.click();
+                        
+                        // Small delay between downloads
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                    }
+                    
+                    showSuccess(`Downloaded ${canvases.length} images!`);
+                }
+            } catch (error) {
+                console.error('Download error:', error);
+                showError('Error downloading images: ' + error.message);
+            }
+        }
+        
+        function showLoading(message) {
+            status.innerHTML = message;
+        }
+        
+        function showError(message) {
+            status.innerHTML = message;
+        }
+        
+        function showSuccess(message) {
+            status.innerHTML = message;
+        }
+    </script>
+</body>
+</html>
