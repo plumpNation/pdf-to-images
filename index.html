@@ -4,76 +4,124 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PDF First Page to Image</title>
-
 </head>
 <body>
     <input type="file" id="fileInput" accept=".pdf">
-    <input type="text" id="endpointInput" placeholder="Enter upload endpoint URL" style="width: 300px; margin-left: 10px;">
-    <button id="uploadBtn" style="display: none;">Upload All to Endpoint</button>
+    
+    <label for="qualitySlider">JPEG Quality:</label>
+    <input type="range" id="qualitySlider" min="0.1" max="1" step="0.1" value="0.9">
+    <span id="qualityValue">0.9</span>
+    
+    <div id="uploadSection" style="display: none;">
+        <input type="text" id="endpointInput" placeholder="Enter upload endpoint URL">
+        <button id="uploadBtn">Upload All to Endpoint</button>
+    </div>
     
     <div id="status"></div>
-    <div id="canvasContainer"></div>
+    <div id="imageContainer"></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs" type="module"></script>
     
     <script type="module">
-        // Import PDF.js
         import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs';
         
-        // Set worker path
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs';
         
         const fileInput = document.getElementById('fileInput');
         const endpointInput = document.getElementById('endpointInput');
         const uploadBtn = document.getElementById('uploadBtn');
+        const uploadSection = document.getElementById('uploadSection');
+        const qualitySlider = document.getElementById('qualitySlider');
+        const qualityValue = document.getElementById('qualityValue');
         const status = document.getElementById('status');
-        const canvasContainer = document.getElementById('canvasContainer');
-        let canvases = []; // Store all canvases for upload
+        const imageContainer = document.getElementById('imageContainer');
         
-        // Handle file upload
+        let pdfDocument = null;
+        let imageBlobs = [];
+        let currentObjectUrls = [];
+        let isProcessing = false;
+        
         fileInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
-            if (file) handleFile(file);
+            if (file) loadPDF(file);
         });
         
-        // Handle upload to endpoint
+        qualitySlider.addEventListener('input', (e) => {
+            qualityValue.textContent = e.target.value;
+            if (pdfDocument && !isProcessing) {
+                stopAndRestart();
+            }
+        });
+        
         uploadBtn.addEventListener('click', uploadAllImages);
         
-        async function handleFile(file) {
+        async function loadPDF(file) {
             try {
                 showLoading('Loading PDF...');
                 
-                // Clear previous canvases
-                canvasContainer.innerHTML = '';
-                canvases = [];
-                uploadBtn.style.display = 'none';
-                
                 const arrayBuffer = await file.arrayBuffer();
-                const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+                pdfDocument = await pdfjsLib.getDocument(arrayBuffer).promise;
                 
-                showLoading(`Rendering ${pdf.numPages} pages...`);
+                await convertToJPEGs();
                 
-                // Render all pages
-                for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-                    const page = await pdf.getPage(pageNum);
+            } catch (error) {
+                console.error('Error:', error);
+                showError('Error loading PDF: ' + error.message);
+            }
+        }
+        
+        function stopAndRestart() {
+            isProcessing = false;
+            hideUploadSection();
+            clearMemoryAndDOM();
+            convertToJPEGs();
+        }
+        
+        function clearMemoryAndDOM() {
+            currentObjectUrls.forEach(url => URL.revokeObjectURL(url));
+            currentObjectUrls = [];
+            imageBlobs = [];
+            imageContainer.innerHTML = '';
+        }
+        
+        function showUploadSection() {
+            uploadSection.style.display = 'block';
+        }
+        
+        function hideUploadSection() {
+            uploadSection.style.display = 'none';
+        }
+        
+        async function convertToJPEGs() {
+            if (isProcessing) return;
+            
+            try {
+                isProcessing = true;
+                hideUploadSection();
+                clearMemoryAndDOM();
+                
+                const totalPages = pdfDocument.numPages;
+                const quality = parseFloat(qualitySlider.value);
+                const tempBlobs = [];
+                const tempUrls = [];
+                const tempElements = [];
+                
+                for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+                    if (!isProcessing) return;
                     
-                    // Create canvas for this page
+                    showLoading(`Converting page ${pageNum} of ${totalPages} to JPEG...`);
+                    
+                    const page = await pdfDocument.getPage(pageNum);
+                    
                     const canvas = document.createElement('canvas');
                     const ctx = canvas.getContext('2d');
                     
-                    // Set scale for good quality
                     const scale = 2.0;
                     const viewport = page.getViewport({ scale });
                     
-                    // Set canvas dimensions
                     canvas.width = viewport.width;
                     canvas.height = viewport.height;
-                    canvas.style.width = viewport.width / 2 + 'px';
-                    canvas.style.height = viewport.height / 2 + 'px';
-                    canvas.style.display = 'block';
-                    canvas.style.marginBottom = '10px';
                     
-                    // Render page to canvas
                     const renderContext = {
                         canvasContext: ctx,
                         viewport: viewport
@@ -81,23 +129,45 @@
                     
                     await page.render(renderContext).promise;
                     
-                    // Store canvas for download
-                    canvases.push(canvas);
+                    if (!isProcessing) return;
                     
-                    // Add page number label
+                    const blob = await new Promise(resolve => {
+                        canvas.toBlob(resolve, 'image/jpeg', quality);
+                    });
+                    
+                    if (!isProcessing) return;
+                    
+                    const objectUrl = URL.createObjectURL(blob);
+                    
+                    tempBlobs.push(blob);
+                    tempUrls.push(objectUrl);
+                    
                     const pageLabel = document.createElement('p');
                     pageLabel.textContent = `Page ${pageNum}`;
-                    canvasContainer.appendChild(pageLabel);
-                    canvasContainer.appendChild(canvas);
+                    
+                    const img = document.createElement('img');
+                    img.src = objectUrl;
+                    
+                    tempElements.push(pageLabel, img);
                 }
                 
-                // Show upload button
-                uploadBtn.style.display = 'inline-block';
-                showSuccess(`Successfully rendered all ${pdf.numPages} pages!`);
+                if (isProcessing) {
+                    imageBlobs = tempBlobs;
+                    currentObjectUrls = tempUrls;
+                    
+                    tempElements.forEach(element => {
+                        imageContainer.appendChild(element);
+                    });
+                    
+                    showSuccess(`Successfully converted all ${totalPages} pages!`);
+                    showUploadSection();
+                }
                 
             } catch (error) {
                 console.error('Error:', error);
-                showError('Error loading PDF: ' + error.message);
+                showError('Error converting PDF: ' + error.message);
+            } finally {
+                isProcessing = false;
             }
         }
         
@@ -108,27 +178,20 @@
                 return;
             }
             
+            if (imageBlobs.length === 0) {
+                showError('No images to upload');
+                return;
+            }
+            
             try {
-                showLoading('Preparing images for upload...');
-                
-                // Create FormData with all images
-                const formData = new FormData();
-                
-                for (let i = 0; i < canvases.length; i++) {
-                    const canvas = canvases[i];
-                    
-                    // Convert canvas to blob
-                    const blob = await new Promise(resolve => {
-                        canvas.toBlob(resolve, 'image/jpeg', 0.9);
-                    });
-                    
-                    // Add to FormData with 'images' field name (matching multer config)
-                    formData.append('images', blob, `page_${i + 1}.jpg`);
-                }
-                
                 showLoading('Uploading all images...');
                 
-                // Upload all images in one request
+                const formData = new FormData();
+                
+                for (let i = 0; i < imageBlobs.length; i++) {
+                    formData.append('images', imageBlobs[i], `page_${i + 1}.jpg`);
+                }
+                
                 const response = await fetch(endpoint, {
                     method: 'POST',
                     body: formData
@@ -139,7 +202,7 @@
                 }
                 
                 const result = await response.json();
-                showSuccess(`Successfully uploaded all ${canvases.length} images! Files: ${result.files?.map(f => f.originalName).join(', ')}`);
+                showSuccess(`Successfully uploaded all ${imageBlobs.length} images! Files: ${result.files?.map(f => f.originalName).join(', ')}`);
                 
             } catch (error) {
                 console.error('Upload error:', error);
