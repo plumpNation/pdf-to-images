@@ -189,6 +189,15 @@ export const usePdfConverter = () => {
     );
   }, []);
 
+  const handleImageReorder = useCallback((fromIndex: number, toIndex: number): void => {
+    setImages(prevImages => {
+      const newImages = [...prevImages];
+      const [movedImage] = newImages.splice(fromIndex, 1);
+      newImages.splice(toIndex, 0, movedImage);
+      return newImages;
+    });
+  }, []);
+
   useEffect(() => {
     return () => {
       images.forEach(image => URL.revokeObjectURL(image.url));
@@ -204,6 +213,7 @@ export const usePdfConverter = () => {
     isProcessingComplete,
     handleFileChange,
     handleUpload,
-    handleImageToggle
+    handleImageToggle,
+    handleImageReorder
   };
 };

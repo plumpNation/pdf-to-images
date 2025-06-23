@@ -17,7 +17,8 @@ const App: FC = () => {
     isProcessingComplete,
     handleFileChange,
     handleUpload,
-    handleImageToggle
+    handleImageToggle,
+    handleImageReorder
   } = usePdfConverter();
 
   const hasSelectedImages = images.some(image => image.selected);
@@ -43,6 +44,7 @@ const App: FC = () => {
       <ImageDisplay 
         images={images} 
         onImageToggle={handleImageToggle} 
+        onImageReorder={handleImageReorder}
       />
     </div>
   );
