@@ -93,7 +93,8 @@ export const usePdfConverter = () => {
         tempImages.push({
           blob,
           url,
-          pageNumber: pageNum
+          pageNumber: pageNum,
+          selected: true // Default to selected
         });
       }
 
@@ -126,20 +127,22 @@ export const usePdfConverter = () => {
       return;
     }
 
-    if (images.length === 0) {
+    const selectedImages = images.filter(image => image.selected);
+
+    if (selectedImages.length === 0) {
       setStatus('error');
-      setStatusMessage('No images to upload');
+      setStatusMessage('No images selected for upload');
 
       return;
     }
 
     try {
       setStatus('loading');
-      setStatusMessage('Uploading all images...');
+      setStatusMessage(`Uploading ${selectedImages.length} selected images...`);
 
       const formData = new FormData();
       
-      images.forEach((image) => {
+      selectedImages.forEach((image) => {
         formData.append('images', image.blob, `page_${image.pageNumber}.jpg`);
       });
 
@@ -156,7 +159,7 @@ export const usePdfConverter = () => {
 
       setStatus('success');
       setStatusMessage(
-        `Successfully uploaded all ${images.length} images! Files: ${
+        `Successfully uploaded ${selectedImages.length} selected images! Files: ${
           result.files?.map(f => f.originalName).join(', ') || 'uploaded'
         }`
       );
@@ -176,6 +179,16 @@ export const usePdfConverter = () => {
     }
   }, [convertToJPEGs]);
 
+  const handleImageToggle = useCallback((pageNumber: number, selected: boolean): void => {
+    setImages(prevImages => 
+      prevImages.map(image => 
+        image.pageNumber === pageNumber 
+          ? { ...image, selected }
+          : image
+      )
+    );
+  }, []);
+
   useEffect(() => {
     return () => {
       images.forEach(image => URL.revokeObjectURL(image.url));
@@ -190,6 +203,7 @@ export const usePdfConverter = () => {
     images,
     isProcessingComplete,
     handleFileChange,
-    handleUpload
+    handleUpload,
+    handleImageToggle
   };
 };

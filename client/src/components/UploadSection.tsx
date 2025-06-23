@@ -5,7 +5,7 @@ interface UploadSectionProps {
 }
 
 export const UploadSection: React.FC<UploadSectionProps> = ({ onUpload }) => {
-  const [endpoint, setEndpoint] = useState<string>('');
+  const [endpoint, setEndpoint] = useState<string>('http://localhost:1234/upload');
 
   const handleUpload = (): void => {
     onUpload(endpoint);

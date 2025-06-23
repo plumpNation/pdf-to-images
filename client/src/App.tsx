@@ -16,8 +16,11 @@ const App: FC = () => {
     images,
     isProcessingComplete,
     handleFileChange,
-    handleUpload
+    handleUpload,
+    handleImageToggle
   } = usePdfConverter();
+
+  const hasSelectedImages = images.some(image => image.selected);
 
   return (
     <div>
@@ -28,7 +31,7 @@ const App: FC = () => {
         onQualityChange={setQuality} 
       />
       
-      {isProcessingComplete && (
+      {isProcessingComplete && hasSelectedImages && (
         <UploadSection onUpload={handleUpload} />
       )}
       
@@ -37,7 +40,10 @@ const App: FC = () => {
         message={statusMessage} 
       />
       
-      <ImageDisplay images={images} />
+      <ImageDisplay 
+        images={images} 
+        onImageToggle={handleImageToggle} 
+      />
     </div>
   );
 };
