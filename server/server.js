@@ -2,8 +2,12 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const cors = require('cors');
 
 const app = express();
+
+// Enable CORS for all origins
+app.use(cors());
 
 // Create uploads directory if it doesn't exist
 const uploadsDir = 'uploads';
@@ -14,7 +18,16 @@ if (!fs.existsSync(uploadsDir)) {
 // Configure multer for file storage
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, uploadsDir);
+    // Create a datetime-stamped folder for each upload session
+    if (!req.uploadSubdir) {
+      const now = new Date();
+      const folderName = now.toISOString().replace(/[:.]/g, '-');
+      req.uploadSubdir = path.join(uploadsDir, folderName);
+      if (!fs.existsSync(req.uploadSubdir)) {
+        fs.mkdirSync(req.uploadSubdir, { recursive: true });
+      }
+    }
+    cb(null, req.uploadSubdir);
   },
   filename: (req, file, cb) => {
     // Generate unique filename with timestamp
@@ -42,7 +55,7 @@ const upload = multer({
 });
 
 // Upload endpoint
-app.post('/upload', upload.array('images', 10), (req, res) => {
+app.post('/upload', upload.array('images', 100), (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ error: 'No files uploaded' });
@@ -57,6 +70,7 @@ app.post('/upload', upload.array('images', 10), (req, res) => {
 
     res.json({
       message: 'Files uploaded successfully',
+      folder: req.uploadSubdir,
       files: fileInfo
     });
   } catch (error) {
@@ -77,7 +91,7 @@ app.use((error, req, res, next) => {
   res.status(400).json({ error: error.message });
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 1234;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });

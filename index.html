@@ -6,9 +6,10 @@
     <title>PDF First Page to Image</title>
 
 </head>
-<body>    
+<body>
     <input type="file" id="fileInput" accept=".pdf">
-    <button id="downloadBtn" style="display: none;">Download All as JPEG</button>
+    <input type="text" id="endpointInput" placeholder="Enter upload endpoint URL" style="width: 300px; margin-left: 10px;">
+    <button id="uploadBtn" style="display: none;">Upload All to Endpoint</button>
     
     <div id="status"></div>
     <div id="canvasContainer"></div>
@@ -23,10 +24,11 @@
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs';
         
         const fileInput = document.getElementById('fileInput');
-        const downloadBtn = document.getElementById('downloadBtn');
+        const endpointInput = document.getElementById('endpointInput');
+        const uploadBtn = document.getElementById('uploadBtn');
         const status = document.getElementById('status');
         const canvasContainer = document.getElementById('canvasContainer');
-        let canvases = []; // Store all canvases for download
+        let canvases = []; // Store all canvases for upload
         
         // Handle file upload
         fileInput.addEventListener('change', (e) => {
@@ -34,8 +36,8 @@
             if (file) handleFile(file);
         });
         
-        // Handle download
-        downloadBtn.addEventListener('click', downloadAllImages);
+        // Handle upload to endpoint
+        uploadBtn.addEventListener('click', uploadAllImages);
         
         async function handleFile(file) {
             try {
@@ -44,7 +46,7 @@
                 // Clear previous canvases
                 canvasContainer.innerHTML = '';
                 canvases = [];
-                downloadBtn.style.display = 'none';
+                uploadBtn.style.display = 'none';
                 
                 const arrayBuffer = await file.arrayBuffer();
                 const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
@@ -89,8 +91,8 @@
                     canvasContainer.appendChild(canvas);
                 }
                 
-                // Show download button
-                downloadBtn.style.display = 'inline-block';
+                // Show upload button
+                uploadBtn.style.display = 'inline-block';
                 showSuccess(`Successfully rendered all ${pdf.numPages} pages!`);
                 
             } catch (error) {
@@ -99,55 +101,49 @@
             }
         }
         
-        async function downloadAllImages() {
+        async function uploadAllImages() {
+            const endpoint = endpointInput.value.trim();
+            if (!endpoint) {
+                showError('Please enter an endpoint URL');
+                return;
+            }
+            
             try {
-                // Check if File System Access API is supported
-                if ('showDirectoryPicker' in window) {
-                    // Use File System Access API to let user choose directory
-                    const dirHandle = await window.showDirectoryPicker();
+                showLoading('Preparing images for upload...');
+                
+                // Create FormData with all images
+                const formData = new FormData();
+                
+                for (let i = 0; i < canvases.length; i++) {
+                    const canvas = canvases[i];
                     
-                    showLoading('Downloading images...');
+                    // Convert canvas to blob
+                    const blob = await new Promise(resolve => {
+                        canvas.toBlob(resolve, 'image/jpeg', 0.9);
+                    });
                     
-                    for (let i = 0; i < canvases.length; i++) {
-                        const canvas = canvases[i];
-                        
-                        // Convert canvas to blob
-                        const blob = await new Promise(resolve => {
-                            canvas.toBlob(resolve, 'image/jpeg', 0.9);
-                        });
-                        
-                        // Create file in selected directory
-                        const fileName = `page_${i + 1}.jpg`;
-                        const fileHandle = await dirHandle.getFileHandle(fileName, { create: true });
-                        const writable = await fileHandle.createWritable();
-                        await writable.write(blob);
-                        await writable.close();
-                    }
-                    
-                    showSuccess(`Downloaded ${canvases.length} images to selected folder!`);
-                } else {
-                    // Fallback: download files individually
-                    showLoading('Downloading images (one by one)...');
-                    
-                    for (let i = 0; i < canvases.length; i++) {
-                        const canvas = canvases[i];
-                        const dataURL = canvas.toDataURL('image/jpeg', 0.9);
-                        
-                        // Create download link
-                        const link = document.createElement('a');
-                        link.download = `page_${i + 1}.jpg`;
-                        link.href = dataURL;
-                        link.click();
-                        
-                        // Small delay between downloads
-                        await new Promise(resolve => setTimeout(resolve, 100));
-                    }
-                    
-                    showSuccess(`Downloaded ${canvases.length} images!`);
+                    // Add to FormData with 'images' field name (matching multer config)
+                    formData.append('images', blob, `page_${i + 1}.jpg`);
                 }
+                
+                showLoading('Uploading all images...');
+                
+                // Upload all images in one request
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
+                }
+                
+                const result = await response.json();
+                showSuccess(`Successfully uploaded all ${canvases.length} images! Files: ${result.files?.map(f => f.originalName).join(', ')}`);
+                
             } catch (error) {
-                console.error('Download error:', error);
-                showError('Error downloading images: ' + error.message);
+                console.error('Upload error:', error);
+                showError('Error uploading images: ' + error.message);
             }
         }
         
