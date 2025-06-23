@@ -1,0 +1,34 @@
+{
+  "hash": "c9c982cc",
+  "configHash": "99bca112",
+  "lockfileHash": "d41058d5",
+  "browserHash": "1aa8058b",
+  "optimized": {
+    "react": {
+      "src": "../../node_modules/react/index.js",
+      "file": "react.js",
+      "fileHash": "b7392ed0",
+      "needsInterop": true
+    },
+    "react-dom/client": {
+      "src": "../../node_modules/react-dom/client.js",
+      "file": "react-dom_client.js",
+      "fileHash": "ba115145",
+      "needsInterop": true
+    },
+    "pdfjs-dist": {
+      "src": "../../node_modules/pdfjs-dist/build/pdf.mjs",
+      "file": "pdfjs-dist.js",
+      "fileHash": "dcc0b838",
+      "needsInterop": false
+    }
+  },
+  "chunks": {
+    "chunk-JKUTLCMY": {
+      "file": "chunk-JKUTLCMY.js"
+    },
+    "chunk-KPM4MXSK": {
+      "file": "chunk-KPM4MXSK.js"
+    }
+  }
+}
