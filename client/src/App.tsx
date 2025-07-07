@@ -5,6 +5,7 @@ import { QualitySlider } from './components/QualitySlider';
 import { UploadSection } from './components/UploadSection';
 import { StatusDisplay } from './components/StatusDisplay';
 import { ImageDisplay } from './components/ImageDisplay';
+import { UploadProgress } from './components/UploadProgress';
 import { usePdfConverter } from './hooks/usePdfConverter';
 
 const App: FC = () => {
@@ -15,6 +16,7 @@ const App: FC = () => {
     statusMessage,
     images,
     isProcessingComplete,
+    isUploading,
     handleFileChange,
     handleUpload,
     handleImageToggle,
@@ -26,24 +28,29 @@ const App: FC = () => {
   return (
     <div>
       <FileInput onFileChange={handleFileChange} />
-      
-      <QualitySlider 
-        quality={quality} 
-        onQualityChange={setQuality} 
+
+      <QualitySlider
+        quality={quality}
+        onQualityChange={setQuality}
       />
-      
+
       {isProcessingComplete && hasSelectedImages && (
         <UploadSection onUpload={handleUpload} />
       )}
-      
-      <StatusDisplay 
-        status={status} 
-        message={statusMessage} 
+
+      <UploadProgress
+        images={images}
+        isUploading={isUploading}
       />
-      
-      <ImageDisplay 
-        images={images} 
-        onImageToggle={handleImageToggle} 
+
+      <StatusDisplay
+        status={status}
+        message={statusMessage}
+      />
+
+      <ImageDisplay
+        images={images}
+        onImageToggle={handleImageToggle}
         onImageReorder={handleImageReorder}
       />
     </div>

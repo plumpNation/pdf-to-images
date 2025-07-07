@@ -13,6 +13,7 @@ export const usePdfConverter = () => {
   const [images, setImages] = useState<ImageData[]>([]);
   const [isProcessingComplete, setIsProcessingComplete] = useState<boolean>(false);
   const [uploadFolderName, setUploadFolderName] = useState<string>('');
+  const [isUploading, setIsUploading] = useState<boolean>(false);
 
   const pdfDocumentRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null);
   const isProcessingRef = useRef<boolean>(false);
@@ -23,6 +24,7 @@ export const usePdfConverter = () => {
     setImages([]);
     setIsProcessingComplete(false);
     setUploadFolderName('');
+    setIsUploading(false);
   }, [images]);
 
   const loadPDF = useCallback(async (file: File): Promise<void> => {
@@ -150,6 +152,7 @@ export const usePdfConverter = () => {
 
     setUploadFolderName(folderName);
     setStatus('loading');
+    setIsUploading(true);
     setStatusMessage(`Starting concurrent upload of ${selectedImages.length} selected images to folder: ${folderName}...`);
 
     // Reset all upload statuses
@@ -230,9 +233,12 @@ export const usePdfConverter = () => {
         setStatusMessage(`Uploaded ${successCount} images, ${errorCount} failed. Folder: ${folderName}`);
       }
 
+      setIsUploading(false);
+
     } catch (error) {
       setStatus('error');
       setStatusMessage(`Upload process failed: ${(error as Error).message}`);
+      setIsUploading(false);
     }
 
   }, [images, generateUploadFolderName]);
@@ -283,6 +289,7 @@ export const usePdfConverter = () => {
     images,
     isProcessingComplete,
     uploadFolderName,
+    isUploading,
     handleFileChange,
     handleUpload,
     handleImageToggle,
