@@ -18,15 +18,18 @@ export const usePdfConverter = () => {
 
   const pdfDocumentRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null);
   const isProcessingRef = useRef<boolean>(false);
+  const activeUrlsRef = useRef<Set<string>>(new Set());
 
   const clearImages = useCallback((): void => {
-    images.forEach(image => URL.revokeObjectURL(image.url));
+    // Revoke all tracked URLs
+    activeUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+    activeUrlsRef.current.clear();
 
     setImages([]);
     setIsProcessingComplete(false);
     setUploadFolderName('');
     setIsUploading(false);
-  }, [images]);
+  }, []);
 
   const loadPDF = useCallback(async (file: File): Promise<void> => {
     try {
@@ -94,6 +97,7 @@ export const usePdfConverter = () => {
         }
 
         const url = URL.createObjectURL(blob);
+        activeUrlsRef.current.add(url); // Track the URL
 
         tempImages.push({
           blob,
@@ -306,9 +310,11 @@ export const usePdfConverter = () => {
 
   useEffect(() => {
     return () => {
-      images.forEach(image => URL.revokeObjectURL(image.url));
+      // Cleanup on unmount only
+      activeUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+      activeUrlsRef.current.clear();
     };
-  }, [images]);
+  }, []);
 
   return {
     quality,

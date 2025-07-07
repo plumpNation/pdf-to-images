@@ -23,7 +23,7 @@ const getUploadStatusIcon = (uploadStatus?: string) => {
 export const ImageDisplay: React.FC<ImageDisplayProps> = ({ images, onImageToggle, onImageReorder }) => {
   const selectedCount = images.filter(img => img.selected).length;
   const totalCount = images.length;
-  
+
   const handleSelectAll = () => {
     images.forEach(image => {
       if (!image.selected) {
@@ -31,7 +31,7 @@ export const ImageDisplay: React.FC<ImageDisplayProps> = ({ images, onImageToggl
       }
     });
   };
-  
+
   const handleDeselectAll = () => {
     images.forEach(image => {
       if (image.selected) {
@@ -61,11 +61,11 @@ export const ImageDisplay: React.FC<ImageDisplayProps> = ({ images, onImageToggl
       <div style={{ marginBottom: '20px', padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '5px' }}>
         <h3>Generated Images ({selectedCount} of {totalCount} selected for upload)</h3>
         <div style={{ display: 'flex', gap: '10px' }}>
-          <button 
+          <button
             onClick={handleSelectAll}
             disabled={selectedCount === totalCount}
-            style={{ 
-              padding: '5px 10px', 
+            style={{
+              padding: '5px 10px',
               backgroundColor: selectedCount === totalCount ? '#ccc' : '#007bff',
               color: 'white',
               border: 'none',
@@ -75,11 +75,11 @@ export const ImageDisplay: React.FC<ImageDisplayProps> = ({ images, onImageToggl
           >
             Select All
           </button>
-          <button 
+          <button
             onClick={handleDeselectAll}
             disabled={selectedCount === 0}
-            style={{ 
-              padding: '5px 10px', 
+            style={{
+              padding: '5px 10px',
               backgroundColor: selectedCount === 0 ? '#ccc' : '#dc3545',
               color: 'white',
               border: 'none',
@@ -91,16 +91,16 @@ export const ImageDisplay: React.FC<ImageDisplayProps> = ({ images, onImageToggl
           </button>
         </div>
       </div>
-      
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
+
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
         gap: '20px',
         maxWidth: '100%'
       }}>
         {images.map((image, index) => (
-          <div key={image.pageNumber} style={{ 
-            border: '1px solid #ccc', 
+          <div key={image.pageNumber} style={{
+            border: '1px solid #ccc',
             padding: '15px',
             borderRadius: '8px',
             backgroundColor: 'white',
@@ -127,7 +127,7 @@ export const ImageDisplay: React.FC<ImageDisplayProps> = ({ images, onImageToggl
                   </span>
                 )}
               </div>
-              
+
               {onImageReorder && (
                 <div style={{ display: 'flex', gap: '5px' }}>
                   <button
@@ -165,17 +165,17 @@ export const ImageDisplay: React.FC<ImageDisplayProps> = ({ images, onImageToggl
                 </div>
               )}
             </div>
-            
-            <img 
-              src={image.url} 
-              alt={`Page ${image.pageNumber}`} 
-              style={{ 
+
+            <img
+              src={image.url}
+              alt={`Page ${image.pageNumber}`}
+              style={{
                 width: '100%',
                 height: 'auto',
                 opacity: image.selected ? 1 : 0.5,
                 transition: 'opacity 0.2s ease',
                 borderRadius: '4px'
-              }} 
+              }}
             />
           </div>
         ))}
