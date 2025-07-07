@@ -150,7 +150,7 @@ export const usePdfConverter = () => {
 
     setUploadFolderName(folderName);
     setStatus('loading');
-    setStatusMessage(`Starting upload of ${selectedImages.length} selected images to folder: ${folderName}...`);
+    setStatusMessage(`Starting concurrent upload of ${selectedImages.length} selected images to folder: ${folderName}...`);
 
     // Reset all upload statuses
     setImages(prevImages => 
@@ -160,8 +160,8 @@ export const usePdfConverter = () => {
       }))
     );
 
-    // Upload each image individually to the same folder
-    for (const image of selectedImages) {
+    // Upload all images concurrently
+    const uploadPromises = selectedImages.map(async (image) => {
       try {
         const formData = new FormData();
 
@@ -186,6 +186,8 @@ export const usePdfConverter = () => {
           )
         );
 
+        return { pageNumber: image.pageNumber, success: true, error: null };
+
       } catch (error) {
         // Mark this image as failed
         setImages(prevImages => 
@@ -195,15 +197,26 @@ export const usePdfConverter = () => {
               : img
           )
         );
+
+        return { pageNumber: image.pageNumber, success: false, error: error as Error };
       }
-    }
+    });
 
-    // Check final status
-    setImages(prevImages => {
-      const uploadedImages = prevImages.filter(img => img.selected);
-      const successCount = uploadedImages.filter(img => img.uploadStatus === 'success').length;
-      const errorCount = uploadedImages.filter(img => img.uploadStatus === 'error').length;
+    // Wait for all uploads to complete
+    try {
+      const results = await Promise.allSettled(uploadPromises);
+      
+      // Count successes and failures
+      const successCount = results.filter(result => 
+        result.status === 'fulfilled' && result.value.success
+      ).length;
+      
+      const errorCount = results.filter(result => 
+        result.status === 'rejected' || 
+        (result.status === 'fulfilled' && !result.value.success)
+      ).length;
 
+      // Set final status message
       if (errorCount === 0) {
         setStatus('success');
         setStatusMessage(`Successfully uploaded all ${successCount} images to folder: ${folderName}!`);
@@ -217,8 +230,10 @@ export const usePdfConverter = () => {
         setStatusMessage(`Uploaded ${successCount} images, ${errorCount} failed. Folder: ${folderName}`);
       }
 
-      return prevImages;
-    });
+    } catch (error) {
+      setStatus('error');
+      setStatusMessage(`Upload process failed: ${(error as Error).message}`);
+    }
 
   }, [images, generateUploadFolderName]);
 
