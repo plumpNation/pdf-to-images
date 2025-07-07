@@ -1,7 +1,7 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 
-import type { ProcessingStatus, ImageData } from '../types';
+import type { ProcessingStatus, ImageData, UploadStatusFilter } from '../types';
 
 // Set worker path
 pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.js-4.10.38-pdf.worker.min.mjs';
@@ -14,6 +14,7 @@ export const usePdfConverter = () => {
   const [isProcessingComplete, setIsProcessingComplete] = useState<boolean>(false);
   const [uploadFolderName, setUploadFolderName] = useState<string>('');
   const [isUploading, setIsUploading] = useState<boolean>(false);
+  const [uploadStatusFilter, setUploadStatusFilter] = useState<UploadStatusFilter>('all');
 
   const pdfDocumentRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null);
   const isProcessingRef = useRef<boolean>(false);
@@ -74,7 +75,7 @@ export const usePdfConverter = () => {
 
         canvas.width = viewport.width;
         canvas.height = viewport.height;
-        
+
         await page.render({
           canvasContext: ctx,
           viewport: viewport
@@ -156,7 +157,7 @@ export const usePdfConverter = () => {
     setStatusMessage(`Starting concurrent upload of ${selectedImages.length} selected images to folder: ${folderName}...`);
 
     // Reset all upload statuses
-    setImages(prevImages => 
+    setImages(prevImages =>
       prevImages.map(image => ({
         ...image,
         uploadStatus: image.selected ? 'uploading' : 'idle'
@@ -181,9 +182,9 @@ export const usePdfConverter = () => {
         }
 
         // Mark this image as successfully uploaded
-        setImages(prevImages => 
-          prevImages.map(img => 
-            img.pageNumber === image.pageNumber 
+        setImages(prevImages =>
+          prevImages.map(img =>
+            img.pageNumber === image.pageNumber
               ? { ...img, uploadStatus: 'success' as const }
               : img
           )
@@ -193,9 +194,9 @@ export const usePdfConverter = () => {
 
       } catch (error) {
         // Mark this image as failed
-        setImages(prevImages => 
-          prevImages.map(img => 
-            img.pageNumber === image.pageNumber 
+        setImages(prevImages =>
+          prevImages.map(img =>
+            img.pageNumber === image.pageNumber
               ? { ...img, uploadStatus: 'error' as const }
               : img
           )
@@ -208,14 +209,14 @@ export const usePdfConverter = () => {
     // Wait for all uploads to complete
     try {
       const results = await Promise.allSettled(uploadPromises);
-      
+
       // Count successes and failures
-      const successCount = results.filter(result => 
+      const successCount = results.filter(result =>
         result.status === 'fulfilled' && result.value.success
       ).length;
-      
-      const errorCount = results.filter(result => 
-        result.status === 'rejected' || 
+
+      const errorCount = results.filter(result =>
+        result.status === 'rejected' ||
         (result.status === 'fulfilled' && !result.value.success)
       ).length;
 
@@ -255,9 +256,9 @@ export const usePdfConverter = () => {
   }, [convertToJPEGs]);
 
   const handleImageToggle = useCallback((pageNumber: number, selected: boolean): void => {
-    setImages(prevImages => 
-      prevImages.map(image => 
-        image.pageNumber === pageNumber 
+    setImages(prevImages =>
+      prevImages.map(image =>
+        image.pageNumber === pageNumber
           ? { ...image, selected, uploadStatus: 'idle' }
           : image
       )
@@ -275,6 +276,34 @@ export const usePdfConverter = () => {
     });
   }, []);
 
+  const filteredImages = useMemo(() => {
+    if (uploadStatusFilter === 'all') {
+      return images;
+    }
+    return images.filter(image => image.uploadStatus === uploadStatusFilter);
+  }, [images, uploadStatusFilter]);
+
+  const imageCounts = useMemo(() => {
+    const counts = {
+      all: images.length,
+      idle: 0,
+      uploading: 0,
+      success: 0,
+      error: 0
+    };
+
+    images.forEach(image => {
+      const status = image.uploadStatus || 'idle';
+      counts[status]++;
+    });
+
+    return counts;
+  }, [images]);
+
+  const handleUploadStatusFilterChange = useCallback((filter: UploadStatusFilter): void => {
+    setUploadStatusFilter(filter);
+  }, []);
+
   useEffect(() => {
     return () => {
       images.forEach(image => URL.revokeObjectURL(image.url));
@@ -287,12 +316,16 @@ export const usePdfConverter = () => {
     status,
     statusMessage,
     images,
+    filteredImages,
+    imageCounts,
     isProcessingComplete,
     uploadFolderName,
     isUploading,
+    uploadStatusFilter,
     handleFileChange,
     handleUpload,
     handleImageToggle,
-    handleImageReorder
+    handleImageReorder,
+    handleUploadStatusFilterChange
   };
 };

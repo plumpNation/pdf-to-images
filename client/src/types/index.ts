@@ -7,6 +7,8 @@ export interface UploadResponse {
 
 export type UploadStatus = 'idle' | 'uploading' | 'success' | 'error';
 
+export type UploadStatusFilter = 'all' | UploadStatus;
+
 export interface ImageData {
   blob: Blob;
   url: string;

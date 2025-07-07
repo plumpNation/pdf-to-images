@@ -6,6 +6,7 @@ import { UploadSection } from './components/UploadSection';
 import { StatusDisplay } from './components/StatusDisplay';
 import { ImageDisplay } from './components/ImageDisplay';
 import { UploadProgress } from './components/UploadProgress';
+import { UploadStatusFilterComponent } from './components/UploadStatusFilter';
 import { usePdfConverter } from './hooks/usePdfConverter';
 
 const App: FC = () => {
@@ -15,12 +16,16 @@ const App: FC = () => {
     status,
     statusMessage,
     images,
+    filteredImages,
+    imageCounts,
     isProcessingComplete,
     isUploading,
+    uploadStatusFilter,
     handleFileChange,
     handleUpload,
     handleImageToggle,
-    handleImageReorder
+    handleImageReorder,
+    handleUploadStatusFilterChange
   } = usePdfConverter();
 
   const hasSelectedImages = images.some(image => image.selected);
@@ -48,8 +53,16 @@ const App: FC = () => {
         message={statusMessage}
       />
 
+      {isProcessingComplete && (
+        <UploadStatusFilterComponent
+          currentFilter={uploadStatusFilter}
+          onFilterChange={handleUploadStatusFilterChange}
+          imageCounts={imageCounts}
+        />
+      )}
+
       <ImageDisplay
-        images={images}
+        images={filteredImages}
         onImageToggle={handleImageToggle}
         onImageReorder={handleImageReorder}
       />
