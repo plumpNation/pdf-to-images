@@ -52,7 +52,7 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-const upload = multer({ 
+const upload = multer({
   storage: storage,
   fileFilter: fileFilter,
   limits: {
@@ -89,6 +89,11 @@ app.post('/upload', upload.array('images', 100), (req, res) => {
         path: newPath
       };
     });
+
+    // Randomly fail 10% of the time
+    if (Math.random() < 0.1) {
+      throw new Error('Random upload failure');
+    }
 
     res.json({
       message: 'Files uploaded successfully',
