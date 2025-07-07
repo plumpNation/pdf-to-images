@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 
-import type { ProcessingStatus, ImageData, UploadResponse } from '../types';
+import type { ProcessingStatus, ImageData } from '../types';
 
 // Set worker path
 pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.js-4.10.38-pdf.worker.min.mjs';
@@ -12,7 +12,8 @@ export const usePdfConverter = () => {
   const [statusMessage, setStatusMessage] = useState<string>('');
   const [images, setImages] = useState<ImageData[]>([]);
   const [isProcessingComplete, setIsProcessingComplete] = useState<boolean>(false);
-  
+  const [uploadFolderName, setUploadFolderName] = useState<string>('');
+
   const pdfDocumentRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null);
   const isProcessingRef = useRef<boolean>(false);
 
@@ -21,6 +22,7 @@ export const usePdfConverter = () => {
 
     setImages([]);
     setIsProcessingComplete(false);
+    setUploadFolderName('');
   }, [images]);
 
   const loadPDF = useCallback(async (file: File): Promise<void> => {
@@ -94,7 +96,8 @@ export const usePdfConverter = () => {
           blob,
           url,
           pageNumber: pageNum,
-          selected: true // Default to selected
+          selected: true, // Default to selected
+          uploadStatus: 'idle'
         });
       }
 
@@ -119,6 +122,12 @@ export const usePdfConverter = () => {
     loadPDF(file);
   }, [loadPDF]);
 
+  const generateUploadFolderName = useCallback((): string => {
+    const now = new Date();
+
+    return now.toISOString().replace(/[:.]/g, '-');
+  }, []);
+
   const handleUpload = useCallback(async (endpoint: string): Promise<void> => {
     if (!endpoint.trim()) {
       setStatus('error');
@@ -136,44 +145,89 @@ export const usePdfConverter = () => {
       return;
     }
 
-    try {
-      setStatus('loading');
-      setStatusMessage(`Uploading ${selectedImages.length} selected images...`);
+    // Generate a unique folder name for this upload session
+    const folderName = generateUploadFolderName();
 
-      const formData = new FormData();
-      
-      selectedImages.forEach((image) => {
+    setUploadFolderName(folderName);
+    setStatus('loading');
+    setStatusMessage(`Starting upload of ${selectedImages.length} selected images to folder: ${folderName}...`);
+
+    // Reset all upload statuses
+    setImages(prevImages => 
+      prevImages.map(image => ({
+        ...image,
+        uploadStatus: image.selected ? 'uploading' : 'idle'
+      }))
+    );
+
+    // Upload each image individually to the same folder
+    for (const image of selectedImages) {
+      try {
+        const formData = new FormData();
+
         formData.append('images', image.blob, `page_${image.pageNumber}.jpg`);
-      });
+        formData.append('uploadFolder', folderName);
 
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        body: formData
-      });
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          body: formData
+        });
 
-      if (!response.ok) {
-        throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
+        if (!response.ok) {
+          throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
+        }
+
+        // Mark this image as successfully uploaded
+        setImages(prevImages => 
+          prevImages.map(img => 
+            img.pageNumber === image.pageNumber 
+              ? { ...img, uploadStatus: 'success' as const }
+              : img
+          )
+        );
+
+      } catch (error) {
+        // Mark this image as failed
+        setImages(prevImages => 
+          prevImages.map(img => 
+            img.pageNumber === image.pageNumber 
+              ? { ...img, uploadStatus: 'error' as const }
+              : img
+          )
+        );
+      }
+    }
+
+    // Check final status
+    setImages(prevImages => {
+      const uploadedImages = prevImages.filter(img => img.selected);
+      const successCount = uploadedImages.filter(img => img.uploadStatus === 'success').length;
+      const errorCount = uploadedImages.filter(img => img.uploadStatus === 'error').length;
+
+      if (errorCount === 0) {
+        setStatus('success');
+        setStatusMessage(`Successfully uploaded all ${successCount} images to folder: ${folderName}!`);
+
+      } else if (successCount === 0) {
+        setStatus('error');
+        setStatusMessage(`Failed to upload all ${errorCount} images.`);
+
+      } else {
+        setStatus('error');
+        setStatusMessage(`Uploaded ${successCount} images, ${errorCount} failed. Folder: ${folderName}`);
       }
 
-      const result: UploadResponse = await response.json();
+      return prevImages;
+    });
 
-      setStatus('success');
-      setStatusMessage(
-        `Successfully uploaded ${selectedImages.length} selected images! Files: ${
-          result.files?.map(f => f.originalName).join(', ') || 'uploaded'
-        }`
-      );
-
-    } catch (error) {
-      setStatus('error');
-      setStatusMessage(`Error uploading images: ${(error as Error).message}`);
-    }
-  }, [images]);
+  }, [images, generateUploadFolderName]);
 
   const handleQualityChange = useCallback((newQuality: number): void => {
     setQuality(newQuality);
+
     if (pdfDocumentRef.current && !isProcessingRef.current) {
       isProcessingRef.current = false;
+
       setIsProcessingComplete(false);
       convertToJPEGs();
     }
@@ -183,7 +237,7 @@ export const usePdfConverter = () => {
     setImages(prevImages => 
       prevImages.map(image => 
         image.pageNumber === pageNumber 
-          ? { ...image, selected }
+          ? { ...image, selected, uploadStatus: 'idle' }
           : image
       )
     );
@@ -193,7 +247,9 @@ export const usePdfConverter = () => {
     setImages(prevImages => {
       const newImages = [...prevImages];
       const [movedImage] = newImages.splice(fromIndex, 1);
+
       newImages.splice(toIndex, 0, movedImage);
+
       return newImages;
     });
   }, []);
@@ -211,6 +267,7 @@ export const usePdfConverter = () => {
     statusMessage,
     images,
     isProcessingComplete,
+    uploadFolderName,
     handleFileChange,
     handleUpload,
     handleImageToggle,

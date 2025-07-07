@@ -9,8 +9,12 @@ const app = express();
 // Enable CORS for all origins
 app.use(cors());
 
+// Parse URL-encoded bodies for form data
+app.use(express.urlencoded({ extended: true }));
+
 // Create uploads directory if it doesn't exist
 const uploadsDir = 'uploads';
+
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir);
 }
@@ -18,20 +22,20 @@ if (!fs.existsSync(uploadsDir)) {
 // Configure multer for file storage
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    // Create a datetime-stamped folder for each upload session
-    if (!req.uploadSubdir) {
-      const now = new Date();
-      const folderName = now.toISOString().replace(/[:.]/g, '-');
-      req.uploadSubdir = path.join(uploadsDir, folderName);
-      if (!fs.existsSync(req.uploadSubdir)) {
-        fs.mkdirSync(req.uploadSubdir, { recursive: true });
-      }
+    // Use a temporary directory first, we'll move files later
+    const tempDir = path.join(uploadsDir, 'temp');
+
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
     }
-    cb(null, req.uploadSubdir);
+
+    cb(null, tempDir);
   },
+
   filename: (req, file, cb) => {
     // Generate unique filename with timestamp
     const uniqueName = Date.now() + '-' + Math.round(Math.random() * 1E9);
+
     cb(null, uniqueName + path.extname(file.originalname));
   }
 });
@@ -39,8 +43,10 @@ const storage = multer.diskStorage({
 // File filter to accept only JPEGs
 const fileFilter = (req, file, cb) => {
   const allowedTypes = ['image/jpeg', 'image/jpg'];
+
   if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);
+
   } else {
     cb(new Error('Only JPEG files are allowed'), false);
   }
@@ -61,19 +67,37 @@ app.post('/upload', upload.array('images', 100), (req, res) => {
       return res.status(400).json({ error: 'No files uploaded' });
     }
 
-    const fileInfo = req.files.map(file => ({
-      originalName: file.originalname,
-      filename: file.filename,
-      size: file.size,
-      path: file.path
-    }));
+    // Get the upload folder name from the request body
+    const uploadFolder = req.body.uploadFolder || new Date().toISOString().replace(/[:.]/g, '-');
+    const finalDir = path.join(uploadsDir, uploadFolder);
+
+    // Create the final directory if it doesn't exist
+    if (!fs.existsSync(finalDir)) {
+      fs.mkdirSync(finalDir, { recursive: true });
+    }
+
+    // Move files from temp directory to final directory
+    const fileInfo = req.files.map(file => {
+      const newPath = path.join(finalDir, file.filename);
+
+      fs.renameSync(file.path, newPath);
+
+      return {
+        originalName: file.originalname,
+        filename: file.filename,
+        size: file.size,
+        path: newPath
+      };
+    });
 
     res.json({
       message: 'Files uploaded successfully',
-      folder: req.uploadSubdir,
+      uploadFolder,
       files: fileInfo
     });
+
   } catch (error) {
+    console.error('Upload error:', error);
     res.status(500).json({ error: 'Upload failed' });
   }
 });
@@ -84,10 +108,12 @@ app.use((error, req, res, next) => {
     if (error.code === 'LIMIT_FILE_SIZE') {
       return res.status(400).json({ error: 'File too large' });
     }
+
     if (error.code === 'LIMIT_FILE_COUNT') {
       return res.status(400).json({ error: 'Too many files' });
     }
   }
+
   res.status(400).json({ error: error.message });
 });
 

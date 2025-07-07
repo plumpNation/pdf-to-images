@@ -20,7 +20,7 @@ export const UploadSection: React.FC<UploadSectionProps> = ({ onUpload }) => {
         onChange={(e) => setEndpoint(e.target.value)}
       />
       <button onClick={handleUpload}>
-        Upload All to Endpoint
+        Upload Selected Images Individually
       </button>
     </div>
   );

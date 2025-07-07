@@ -7,6 +7,19 @@ interface ImageDisplayProps {
   onImageReorder?: (fromIndex: number, toIndex: number) => void;
 }
 
+const getUploadStatusIcon = (uploadStatus?: string) => {
+  switch (uploadStatus) {
+    case 'uploading':
+      return '⏳'; // Hourglass for uploading
+    case 'success':
+      return '✅'; // Green checkmark for success
+    case 'error':
+      return '❌'; // Red X for error
+    default:
+      return null;
+  }
+};
+
 export const ImageDisplay: React.FC<ImageDisplayProps> = ({ images, onImageToggle, onImageReorder }) => {
   const selectedCount = images.filter(img => img.selected).length;
   const totalCount = images.length;
@@ -108,6 +121,11 @@ export const ImageDisplay: React.FC<ImageDisplayProps> = ({ images, onImageToggl
                 <label htmlFor={`page-${image.pageNumber}`}>
                   Page {image.pageNumber} {image.selected ? '(will be uploaded)' : '(will be skipped)'}
                 </label>
+                {image.uploadStatus && (
+                  <span style={{ marginLeft: '10px', fontSize: '16px' }}>
+                    {getUploadStatusIcon(image.uploadStatus)}
+                  </span>
+                )}
               </div>
               
               {onImageReorder && (
