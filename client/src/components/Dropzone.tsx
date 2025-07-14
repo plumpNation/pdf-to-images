@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 
 interface DropzoneProps {
-  onFilesDrop: (files: File[]) => void;
+  onFileChange: (file: File) => void;
 }
 
-const Dropzone: React.FC<DropzoneProps> = ({ onFilesDrop }) => {
+const Dropzone: React.FC<DropzoneProps> = ({ onFileChange }) => {
   const [isDragOver, setIsDragOver] = useState(false);
 
   const handleDragEnter = (event: React.DragEvent<HTMLDivElement>): void => {
@@ -35,11 +35,16 @@ const Dropzone: React.FC<DropzoneProps> = ({ onFilesDrop }) => {
       // Extract files from dataTransfer
       const fileList = event.dataTransfer.files;
       
-      // Convert FileList to regular array
+      // Convert FileList to regular array and filter for PDF files
       const filesArray = Array.from(fileList);
+      const pdfFiles = filesArray.filter(file => file.type === 'application/pdf');
       
-      // Call the callback with the files array
-      onFilesDrop(filesArray);
+      // For this PDF converter, we only handle the first PDF file
+      if (pdfFiles.length > 0) {
+        onFileChange(pdfFiles[0]);
+      } else if (filesArray.length > 0) {
+        console.warn('Only PDF files are supported');
+      }
     } catch (error) {
       console.error('Error handling dropped files:', error);
     }
@@ -68,7 +73,7 @@ const Dropzone: React.FC<DropzoneProps> = ({ onFilesDrop }) => {
       tabIndex={0}
       aria-label="Drop files here to upload"
     >
-      Drop files here
+      Drop PDF files here
     </div>
   );
 };

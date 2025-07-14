@@ -1,6 +1,6 @@
 import { type FC } from 'react';
 
-import { FileInput } from './components/FileInput';
+import Dropzone from './components/Dropzone';
 import { QualitySlider } from './components/QualitySlider';
 import { UploadSection } from './components/UploadSection';
 import { StatusDisplay } from './components/StatusDisplay';
@@ -32,7 +32,7 @@ const App: FC = () => {
 
   return (
     <div>
-      <FileInput onFileChange={handleFileChange} />
+      <Dropzone onFileChange={handleFileChange} />
 
       <QualitySlider
         quality={quality}
